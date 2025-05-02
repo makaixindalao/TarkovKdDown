@@ -10,6 +10,7 @@
 - **状态机设计**：稳定可靠的工作流程控制
 - **详细日志**：记录每个操作步骤，便于调试和监控
 - **可配置性**：易于调整超时时间、匹配阈值等参数
+- **进程监控**：自动检测游戏进程是否存在，并在异常时尝试重启游戏
 
 ## 系统要求
 
@@ -31,30 +32,31 @@ pip install -r requirements.txt
 
 1. 确保游戏设置为窗口化模式，分辨率为1280x800
 2. 首次进入工厂需要手动吃一个蛋黄酱，并找AI打出出血效果
-3. 运行主程序：`python main.py`
+3. 运行启动脚本：`python run.py`
 4. 程序启动后，会提示您在3秒内切换到游戏窗口
 5. 之后程序会自动执行完整的送死流程
 
 ### 自定义流程
 
-如需自定义流程，可以修改`main.py`中的`WorkflowState`枚举和`WorkflowStateMachine.execute()`方法。
+如需自定义流程，可以修改`src/main.py`中的`WorkflowState`枚举和`WorkflowStateMachine.execute()`方法。
 
 ### 替换截图
 
 如果您使用不同的分辨率或界面，需要替换模板图片：
 
 1. 使用截图工具截取需要识别的界面元素
-2. 将截图保存到`images`文件夹
+2. 将截图保存到`data/images`文件夹
 3. 使用以下代码添加图片：
 
 ```python
-from image_manager import add_image
+from src.image.image_manager import add_image
 
 # 添加图片
 add_image("path/to/your/screenshot.png", "image_name")
 ```
 
 默认需要的图片包括：
+
 - `escape.png`: 主界面的"ESCAPE"按钮
 - `pmc.png`/`pmc_select.png`: PMC选择界面
 - `nextstep.png`: "下一步"按钮
@@ -68,24 +70,46 @@ add_image("path/to/your/screenshot.png", "image_name")
 
 程序使用状态机模式实现自动化流程：
 
-1. **初始化**：等待用户切换到游戏窗口
-2. **等待主界面**：识别主界面并点击进入
-3. **选择PMC**：选择PMC角色
-4. **选择地图**：选择Factory(工厂)地图
-5. **准备**：点击准备按钮进入游戏
-6. **等待死亡**：等待角色死亡
-7. **返回主菜单**：死亡后返回主菜单
-8. **循环**：重复以上步骤
+1. **初始化系统**：等待用户切换到游戏窗口
+2. **等待主界面加载**：识别主界面并点击进入
+3. **选择PMC角色**：选择PMC角色
+4. **进行下一步操作**：点击下一步按钮
+5. **选择工厂地图**：选择Factory(工厂)地图
+6. **准备部署角色**：点击准备按钮进入游戏
+7. **等待游戏开始**：等待游戏加载完成
+8. **等待角色死亡**：等待角色死亡
+9. **返回主菜单**：死亡后返回主菜单
+10. **确认对话框选项**：确认返回主菜单
+11. **循环**：重复以上步骤
 
 ## 文件结构
 
-- `main.py`: 主程序和状态机实现
-- `image_recognition.py`: 图像识别模块
-- `mouse_control.py`: 鼠标控制模块
-- `keyboard_control.py`: 键盘控制模块
-- `image_manager.py`: 图片资源管理模块
-- `images/`: 存储模板图像的文件夹
-- `automation.log`: 运行日志
+```text
+tarkov_kd_down/              # 项目根目录
+├── src/                     # 源代码目录
+│   ├── __init__.py          # 使src成为一个包
+│   ├── main.py              # 主程序和状态机实现
+│   ├── process/             # 进程相关模块
+│   │   ├── __init__.py
+│   │   └── process_manager.py  # 进程管理模块
+│   ├── image/               # 图像相关模块
+│   │   ├── __init__.py
+│   │   ├── image_manager.py    # 图片资源管理模块
+│   │   └── image_recognition.py  # 图像识别模块
+│   └── input/               # 输入控制相关模块
+│       ├── __init__.py
+│       ├── mouse_control.py    # 鼠标控制模块
+│       └── keyboard_control.py  # 键盘控制模块
+├── data/                    # 数据目录
+│   ├── images/              # 图像文件
+│   └── templates/           # 模板文件
+├── logs/                    # 日志目录
+│   └── automation.log       # 运行日志
+├── .gitignore               # Git忽略文件
+├── README.md                # 项目说明文档
+├── requirements.txt         # 依赖项列表
+└── run.py                   # 启动脚本
+```
 
 ## 注意事项
 
@@ -99,8 +123,8 @@ add_image("path/to/your/screenshot.png", "image_name")
 - **无法识别图像**：检查游戏分辨率和窗口模式，更新模板图片
 - **点击位置不准确**：确保游戏窗口位置固定，或重新截取模板图片
 - **程序卡在某个状态**：检查日志文件，可能是超时设置不足或模板图片不匹配
+- **游戏进程不存在**：程序会自动检测并尝试重启游戏，如果失败，请手动启动游戏
 
 ## 许可证
 
 MIT License
-
