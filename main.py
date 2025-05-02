@@ -1,7 +1,19 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+"""
+塔科夫自动送死掉KD工具主程序
+
+该程序通过图像识别和键鼠模拟，实现全自动化操作，无需人工干预。
+"""
+
 import os
 import time
 import logging
 import enum
+from typing import Tuple, Optional, Dict, Any
+
+# 导入自定义模块
 from image_recognition import find_and_get_center
 from mouse_control import left_click
 from keyboard_control import key_press
@@ -38,20 +50,27 @@ class WorkflowState(enum.Enum):
     ERROR = "错误"
 
 
-def wait_for_image(image_name, timeout=30, check_interval=1.0, threshold=0.7, region=None):
+def wait_for_image(
+    image_name: str,
+    timeout: int = 30,
+    check_interval: float = 1.0,
+    threshold: float = 0.7,
+    region: Optional[Tuple[int, int, int, int]] = None
+) -> Tuple[Optional[Tuple[int, int]], float]:
     """
     等待并寻找指定图片，直到找到或超时
 
-    参数:
+    Args:
         image_name: 图片名称
         timeout: 超时时间（秒）
         check_interval: 检查间隔（秒）
         threshold: 匹配阈值
-        region: 搜索区域
+        region: 搜索区域，格式为(x, y, width, height)
 
-    返回:
-        如果找到: ((center_x, center_y), confidence)
-        如果超时: (None, 0)
+    Returns:
+        Tuple[Optional[Tuple[int, int]], float]:
+            - 如果找到: ((center_x, center_y), confidence)
+            - 如果超时: (None, 0)
     """
     template_path = get_image_path(image_name)
 
@@ -60,39 +79,60 @@ def wait_for_image(image_name, timeout=30, check_interval=1.0, threshold=0.7, re
         logger.warning(f"警告: 模板图像 {image_name} 不存在。")
         return (None, 0)
 
-
     start_time = time.time()
     while time.time() - start_time < timeout:
         # 查找图像并获取中心点
-        (center_point, confidence) = find_and_get_center(template_path, threshold=threshold, region=region)
+        center_point, confidence = find_and_get_center(
+            template_path,
+            threshold=threshold,
+            region=region
+        )
 
         if center_point:
             center_x, center_y = center_point
+            logger.debug(f"找到图像 {image_name}，位置: {center_point}，置信度: {confidence:.4f}")
             return (center_point, confidence)
 
         # 等待一段时间再次检查
         time.sleep(check_interval)
 
-    logger.warning(f"等待图像 {image_name} 超时")
+    logger.warning(f"等待图像 {image_name} 超时（{timeout}秒）")
     return (None, 0)
 
 class WorkflowStateMachine:
-    """工作流状态机"""
+    """
+    工作流状态机
+
+    负责管理和执行自动化工作流程的状态转换和操作。
+    """
 
     def __init__(self):
+        """初始化工作流状态机"""
         self.state = WorkflowState.INIT
-        self.data = {}  # 存储流程中的数据
+        self.data: Dict[str, Any] = {}  # 存储流程中的数据
         self.start_time = time.time()
-        logger.info(f"状态机初始化，初始状态: {self.state.value}")
         self.success_count = 0  # 成功执行次数
 
-    def transition_to(self, new_state):
-        """转换到新状态"""
+        logger.info(f"状态机初始化，初始状态: {self.state.value}")
+
+    def transition_to(self, new_state: WorkflowState) -> None:
+        """
+        转换到新状态
+
+        Args:
+            new_state: 新的工作流状态
+        """
         old_state = self.state
         self.state = new_state
+
+        # 计算当前状态执行时间
         duration = time.time() - self.start_time
+
+        # 记录状态转换日志
         logger.info(f"状态转换: {old_state.value} -> {new_state.value} (耗时: {duration:.2f}秒)")
-        self.start_time = time.time()  # 重置计时器
+
+        # 重置计时器，用于下一个状态的执行时间计算
+        self.start_time = time.time()
 
     def execute(self):
         """执行当前状态的操作"""
@@ -246,9 +286,16 @@ class WorkflowStateMachine:
             self.transition_to(WorkflowState.ERROR)
             return False
 
-def execute_workflow():
+def execute_workflow() -> bool:
     """
     执行自动化工作流程
+
+    创建并执行工作流状态机，处理整个自动化流程。
+
+    Returns:
+        bool: 工作流程是否成功执行
+            - True: 工作流程成功执行
+            - False: 工作流程执行失败
     """
     logger.info("开始执行自动化工作流程...")
 
@@ -256,9 +303,11 @@ def execute_workflow():
     logger.info("请在3秒内切换到目标窗口...")
     time.sleep(3)
 
+    # 创建并执行工作流状态机
     workflow = WorkflowStateMachine()
     success = workflow.execute()
 
+    # 记录执行结果
     if success:
         logger.info("工作流程执行成功!")
     else:
@@ -267,23 +316,35 @@ def execute_workflow():
     return success
 
 
-def main():
+def main() -> None:
     """
     主函数
+
+    程序入口点，负责初始化和启动自动化工作流程。
     """
-    logger.info("=" * 50)
-    logger.info("开始运行自动化程序...")
-    logger.info("=" * 50)
+    # 打印分隔线和启动信息
+    separator = "=" * 50
+    logger.info(separator)
+    logger.info("塔科夫自动送死掉KD工具 - 启动中...")
+    logger.info(separator)
 
-    # 执行工作流程
-    success = execute_workflow()
+    try:
+        # 执行工作流程
+        success = execute_workflow()
 
-    logger.info("=" * 50)
-    if success:
-        logger.info("程序执行成功!")
-    else:
-        logger.warning("程序执行失败，请检查日志了解详情。")
-    logger.info("=" * 50)
+        # 打印结束信息
+        logger.info(separator)
+        if success:
+            logger.info("程序执行成功!")
+        else:
+            logger.warning("程序执行失败，请检查日志了解详情。")
+    except Exception as e:
+        # 捕获并记录未预期的异常
+        logger.exception(f"程序执行过程中发生未预期的异常: {str(e)}")
+        logger.error("程序异常终止")
+    finally:
+        # 确保始终打印结束分隔线
+        logger.info(separator)
 
 if __name__ == "__main__":
     main()
