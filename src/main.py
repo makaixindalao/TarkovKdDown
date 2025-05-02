@@ -19,7 +19,6 @@ from input.mouse_control import left_click
 from input.keyboard_control import key_press
 from image.image_manager import get_image_path, ensure_image_dir, image_exists
 from process.process_manager import is_game_running, start_game
-from window_manager import ensure_game_window_foreground
 
 # 配置日志
 logging.basicConfig(
@@ -62,8 +61,7 @@ def wait_for_image(
     timeout: int = 30,
     check_interval: float = 1.0,
     threshold: float = 0.7,
-    region: Optional[Tuple[int, int, int, int]] = None,
-    ensure_foreground: bool = True
+    region: Optional[Tuple[int, int, int, int]] = None
 ) -> Tuple[Optional[Tuple[int, int]], float]:
     """
     等待并寻找指定图片，直到找到或超时
@@ -74,7 +72,6 @@ def wait_for_image(
         check_interval: 检查间隔（秒）
         threshold: 匹配阈值
         region: 搜索区域，格式为(x, y, width, height)
-        ensure_foreground: 是否确保游戏窗口处于前置状态
 
     Returns:
         Tuple[Optional[Tuple[int, int]], float]:
@@ -90,15 +87,6 @@ def wait_for_image(
 
     start_time = time.time()
     while time.time() - start_time < timeout:
-        # 确保游戏窗口处于前置状态
-        if ensure_foreground:
-            if not ensure_game_window_foreground():
-                logger.warning("无法将游戏窗口设置为前台窗口，继续尝试查找图像...")
-                # 如果无法前置窗口，我们仍然尝试查找图像，但可能会失败
-            else:
-                # 前置窗口后稍微等待一下，确保窗口已经完全激活
-                time.sleep(0.1)
-
         # 查找图像并获取中心点
         center_point, confidence = find_and_get_center(
             template_path,
