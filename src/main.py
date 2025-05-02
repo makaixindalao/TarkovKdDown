@@ -19,6 +19,7 @@ from input.mouse_control import left_click
 from input.keyboard_control import key_press
 from image.image_manager import get_image_path, ensure_image_dir, image_exists
 from process.process_manager import is_game_running, start_game
+from window_manager import ensure_game_window_foreground
 
 # 配置日志
 logging.basicConfig(
@@ -39,7 +40,7 @@ ensure_image_dir()
 class WorkflowState(enum.Enum):
     """
     工作流状态枚举
-    
+
     定义了自动化流程中的所有可能状态，每个状态对应一个特定的操作阶段。
     状态值用于日志记录和状态转换逻辑。
     """
@@ -61,7 +62,8 @@ def wait_for_image(
     timeout: int = 30,
     check_interval: float = 1.0,
     threshold: float = 0.7,
-    region: Optional[Tuple[int, int, int, int]] = None
+    region: Optional[Tuple[int, int, int, int]] = None,
+    ensure_foreground: bool = True
 ) -> Tuple[Optional[Tuple[int, int]], float]:
     """
     等待并寻找指定图片，直到找到或超时
@@ -72,6 +74,7 @@ def wait_for_image(
         check_interval: 检查间隔（秒）
         threshold: 匹配阈值
         region: 搜索区域，格式为(x, y, width, height)
+        ensure_foreground: 是否确保游戏窗口处于前置状态
 
     Returns:
         Tuple[Optional[Tuple[int, int]], float]:
@@ -87,6 +90,15 @@ def wait_for_image(
 
     start_time = time.time()
     while time.time() - start_time < timeout:
+        # 确保游戏窗口处于前置状态
+        if ensure_foreground:
+            if not ensure_game_window_foreground():
+                logger.warning("无法将游戏窗口设置为前台窗口，继续尝试查找图像...")
+                # 如果无法前置窗口，我们仍然尝试查找图像，但可能会失败
+            else:
+                # 前置窗口后稍微等待一下，确保窗口已经完全激活
+                time.sleep(0.1)
+
         # 查找图像并获取中心点
         center_point, confidence = find_and_get_center(
             template_path,
@@ -108,7 +120,7 @@ def wait_for_image(
 class WorkflowStateMachine:
     """
     工作流状态机
-    
+
     负责管理和执行自动化工作流程的状态转换和操作。
     """
 
@@ -124,7 +136,7 @@ class WorkflowStateMachine:
     def transition_to(self, new_state: WorkflowState) -> None:
         """
         转换到新状态
-        
+
         Args:
             new_state: 新的工作流状态
         """
@@ -143,9 +155,9 @@ class WorkflowStateMachine:
     def execute(self) -> bool:
         """
         执行当前状态的操作
-        
+
         根据当前状态执行相应的操作，并根据操作结果转换到下一个状态。
-        
+
         Returns:
             bool: 工作流是否成功执行
                 - True: 工作流成功执行
@@ -270,7 +282,7 @@ class WorkflowStateMachine:
                 else:
                     logger.error(f"状态 {self.state.value} 执行失败，流程终止")
                     self.transition_to(WorkflowState.ERROR_STATE)
-                    
+
             # 错误状态
             elif self.state == WorkflowState.ERROR_STATE:
                 logger.error("工作流程执行失败!")
@@ -307,16 +319,16 @@ class WorkflowStateMachine:
 def execute_workflow() -> bool:
     """
     执行自动化工作流程
-    
+
     创建并执行工作流状态机，处理整个自动化流程。
-    
+
     Returns:
         bool: 工作流程是否成功执行
             - True: 工作流程成功执行
             - False: 工作流程执行失败
     """
     logger.info("开始执行自动化工作流程...")
-    
+
     # 等待用户准备
     logger.info("请在3秒内切换到目标窗口...")
     time.sleep(3)
@@ -324,20 +336,20 @@ def execute_workflow() -> bool:
     # 创建并执行工作流状态机
     workflow = WorkflowStateMachine()
     success = workflow.execute()
-    
+
     # 记录执行结果
     if success:
         logger.info("工作流程执行成功!")
     else:
         logger.warning("工作流程执行失败，请检查日志了解详情。")
-    
+
     return success
 
 
 def main() -> None:
     """
     主函数
-    
+
     程序入口点，负责初始化和启动自动化工作流程。
     """
     # 打印分隔线和启动信息
@@ -345,11 +357,11 @@ def main() -> None:
     logger.info(separator)
     logger.info("塔科夫自动送死掉KD工具 - 启动中...")
     logger.info(separator)
-    
+
     try:
         # 执行工作流程
         success = execute_workflow()
-        
+
         # 打印结束信息
         logger.info(separator)
         if success:
