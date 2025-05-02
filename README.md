@@ -84,7 +84,7 @@ add_image("path/to/your/screenshot.png", "image_name")
 - `mouse_control.py`: 鼠标控制模块
 - `keyboard_control.py`: 键盘控制模块
 - `image_manager.py`: 图片资源管理模块
-- `templates/`: 存储模板图像的文件夹
+- `images/`: 存储模板图像的文件夹
 - `automation.log`: 运行日志
 
 ## 注意事项

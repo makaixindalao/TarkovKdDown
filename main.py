@@ -37,17 +37,23 @@ ensure_image_dir()
 
 # 定义工作流状态
 class WorkflowState(enum.Enum):
-    INIT = "初始化"
-    WAIT_MAIN_MEAN = "等待主界面加载"
-    CHOOSE_PMC = "选择PMC"
-    NEXT_STEP = "下一步"
-    CHOOSE_FACTORY = "选择工厂"
-    READY = "准备"
-    WAIT_GAME_START = "等待游戏开始"
-    WAIT_DEAY = "等待角色死亡"
-    RETURN_TO_MAIN = "返回主菜单"
-    CLICK_YES = "点击是"
-    ERROR = "错误"
+    """
+    工作流状态枚举
+
+    定义了自动化流程中的所有可能状态，每个状态对应一个特定的操作阶段。
+    状态值用于日志记录和状态转换逻辑。
+    """
+    INITIALIZATION = "初始化系统"
+    WAITING_FOR_MAIN_MENU = "等待主界面加载"
+    SELECTING_PMC = "选择PMC角色"
+    PROCEEDING_TO_NEXT = "进行下一步操作"
+    SELECTING_FACTORY_MAP = "选择工厂地图"
+    PREPARING_DEPLOYMENT = "准备部署角色"
+    WAITING_FOR_GAME_START = "等待游戏开始"
+    WAITING_FOR_CHARACTER_DEATH = "等待角色死亡"
+    RETURNING_TO_MAIN_MENU = "返回主菜单"
+    CONFIRMING_DIALOG = "确认对话框选项"
+    ERROR_STATE = "错误状态"
 
 
 def wait_for_image(
@@ -108,7 +114,7 @@ class WorkflowStateMachine:
 
     def __init__(self):
         """初始化工作流状态机"""
-        self.state = WorkflowState.INIT
+        self.state = WorkflowState.INITIALIZATION
         self.data: Dict[str, Any] = {}  # 存储流程中的数据
         self.start_time = time.time()
         self.success_count = 0  # 成功执行次数
@@ -134,127 +140,139 @@ class WorkflowStateMachine:
         # 重置计时器，用于下一个状态的执行时间计算
         self.start_time = time.time()
 
-    def execute(self):
-        """执行当前状态的操作"""
+    def execute(self) -> bool:
+        """
+        执行当前状态的操作
+
+        根据当前状态执行相应的操作，并根据操作结果转换到下一个状态。
+
+        Returns:
+            bool: 工作流是否成功执行
+                - True: 工作流成功执行
+                - False: 工作流执行失败
+        """
         try:
-            if self.state == WorkflowState.INIT:
+            # 初始化状态
+            if self.state == WorkflowState.INITIALIZATION:
                 logger.info("开始执行自动化工作流程...")
                 logger.info("请在3秒内切换到目标窗口...")
                 time.sleep(3)
-                self.transition_to(WorkflowState.WAIT_MAIN_MEAN)
+                self.transition_to(WorkflowState.WAITING_FOR_MAIN_MENU)
 
-            # 等待主界面加载
-            elif self.state == WorkflowState.WAIT_MAIN_MEAN:
+            # 等待主界面加载状态
+            elif self.state == WorkflowState.WAITING_FOR_MAIN_MENU:
                 logger.info(f"等待主界面加载, 当前执行成功次数: {self.success_count}")
                 image_name = "escape"
-                (center_point1, confidence1) = wait_for_image(image_name, timeout=120)
+                center_point1, confidence1 = wait_for_image(image_name, timeout=120)
                 if center_point1:
                     left_click(center_point1[0], center_point1[1])
-                    self.transition_to(WorkflowState.CHOOSE_PMC)
+                    self.transition_to(WorkflowState.SELECTING_PMC)
                 else:
-                    logger.error(f"{self.state}失败，流程终止")
-                    self.transition_to(WorkflowState.ERROR)
+                    logger.error(f"状态 {self.state.value} 执行失败，流程终止")
+                    self.transition_to(WorkflowState.ERROR_STATE)
 
-            # 选择PMC
-            elif self.state == WorkflowState.CHOOSE_PMC:
+            # 选择PMC状态
+            elif self.state == WorkflowState.SELECTING_PMC:
                 image_name = "pmc_select"
-                (center_point1, confidence1) = wait_for_image(image_name, timeout=30)
+                center_point1, confidence1 = wait_for_image(image_name, timeout=30)
                 if center_point1:
-                    self.transition_to(WorkflowState.NEXT_STEP)
+                    self.transition_to(WorkflowState.PROCEEDING_TO_NEXT)
                 else:
                     image_name = "pmc"
-                    (center_point1, confidence1) = wait_for_image(image_name, timeout=30)
+                    center_point1, confidence1 = wait_for_image(image_name, timeout=30)
                     if center_point1:
-                        self.transition_to(WorkflowState.NEXT_STEP)
+                        self.transition_to(WorkflowState.PROCEEDING_TO_NEXT)
                     else:
-                        logger.error(f"{self.state}失败，流程终止")
-                        self.transition_to(WorkflowState.ERROR)
+                        logger.error(f"状态 {self.state.value} 执行失败，流程终止")
+                        self.transition_to(WorkflowState.ERROR_STATE)
 
-            # 下一步
-            elif self.state == WorkflowState.NEXT_STEP:
+            # 下一步状态
+            elif self.state == WorkflowState.PROCEEDING_TO_NEXT:
                 image_name = "nextstep"
-                (center_point1, confidence1) = wait_for_image(image_name, timeout=30)
+                center_point1, confidence1 = wait_for_image(image_name, timeout=30)
                 if center_point1:
                     left_click(center_point1[0], center_point1[1])
-                    self.transition_to(WorkflowState.CHOOSE_FACTORY)
+                    self.transition_to(WorkflowState.SELECTING_FACTORY_MAP)
                 else:
-                    logger.error(f"{self.state}失败，流程终止")
-                    self.transition_to(WorkflowState.ERROR)
+                    logger.error(f"状态 {self.state.value} 执行失败，流程终止")
+                    self.transition_to(WorkflowState.ERROR_STATE)
 
-            # 选择工厂
-            elif self.state == WorkflowState.CHOOSE_FACTORY:
+            # 选择工厂地图状态
+            elif self.state == WorkflowState.SELECTING_FACTORY_MAP:
                 image_name = "factory"
-                (center_point1, confidence1) = wait_for_image(image_name, timeout=30)
+                center_point1, confidence1 = wait_for_image(image_name, timeout=30)
                 if center_point1:
                     left_click(center_point1[0], center_point1[1])
-                    self.transition_to(WorkflowState.READY)
+                    self.transition_to(WorkflowState.PREPARING_DEPLOYMENT)
                 else:
                     image_name = "factory_select"
-                    (center_point1, confidence1) = wait_for_image(image_name, timeout=30)
+                    center_point1, confidence1 = wait_for_image(image_name, timeout=30)
                     if center_point1:
                         left_click(center_point1[0], center_point1[1])
-                        self.transition_to(WorkflowState.READY)
+                        self.transition_to(WorkflowState.PREPARING_DEPLOYMENT)
                     else:
-                        logger.error(f"{self.state}失败，流程终止")
-                        self.transition_to(WorkflowState.ERROR)
+                        logger.error(f"状态 {self.state.value} 执行失败，流程终止")
+                        self.transition_to(WorkflowState.ERROR_STATE)
 
-            # 准备
-            elif self.state == WorkflowState.READY:
+            # 准备部署状态
+            elif self.state == WorkflowState.PREPARING_DEPLOYMENT:
                 image_name = "ready"
-                (center_point1, confidence1) = wait_for_image(image_name, timeout=30)
+                center_point1, confidence1 = wait_for_image(image_name, timeout=30)
                 if center_point1:
                     left_click(center_point1[0], center_point1[1])
-                    self.transition_to(WorkflowState.WAIT_GAME_START)
+                    self.transition_to(WorkflowState.WAITING_FOR_GAME_START)
                 else:
-                    logger.error(f"{self.state}失败，流程终止")
-                    self.transition_to(WorkflowState.ERROR)
+                    logger.error(f"状态 {self.state.value} 执行失败，流程终止")
+                    self.transition_to(WorkflowState.ERROR_STATE)
 
-            # 等待游戏开始
-            elif self.state == WorkflowState.WAIT_GAME_START:
+            # 等待游戏开始状态
+            elif self.state == WorkflowState.WAITING_FOR_GAME_START:
                 image_name = "in_game"
-                (center_point1, confidence1) = wait_for_image(image_name, timeout=600)
+                center_point1, confidence1 = wait_for_image(image_name, timeout=600)
                 if center_point1:
-                    self.transition_to(WorkflowState.WAIT_DEAY)
+                    self.transition_to(WorkflowState.WAITING_FOR_CHARACTER_DEATH)
                 else:
-                    logger.error(f"{self.state}失败，流程终止")
-                    self.transition_to(WorkflowState.ERROR)
+                    logger.error(f"状态 {self.state.value} 执行失败，流程终止")
+                    self.transition_to(WorkflowState.ERROR_STATE)
 
-            # 等待角色死亡
-            elif self.state == WorkflowState.WAIT_DEAY:
+            # 等待角色死亡状态
+            elif self.state == WorkflowState.WAITING_FOR_CHARACTER_DEATH:
                 image_name = "nextstep"
-                (center_point1, confidence1) = wait_for_image(image_name, timeout=600)
+                center_point1, confidence1 = wait_for_image(image_name, timeout=600)
                 if center_point1:
-                    self.transition_to(WorkflowState.RETURN_TO_MAIN)
+                    self.transition_to(WorkflowState.RETURNING_TO_MAIN_MENU)
                 else:
-                    logger.error(f"{self.state}失败，流程终止")
-                    self.transition_to(WorkflowState.ERROR)
+                    logger.error(f"状态 {self.state.value} 执行失败，流程终止")
+                    self.transition_to(WorkflowState.ERROR_STATE)
 
-            # 返回主菜单
-            elif self.state == WorkflowState.RETURN_TO_MAIN:
+            # 返回主菜单状态
+            elif self.state == WorkflowState.RETURNING_TO_MAIN_MENU:
                 image_name = "main_menu"
-                (center_point1, confidence1) = wait_for_image(image_name, timeout=30)
+                center_point1, confidence1 = wait_for_image(image_name, timeout=30)
                 if center_point1:
                     left_click(center_point1[0], center_point1[1])
-                    self.transition_to(WorkflowState.CLICK_YES)
+                    self.transition_to(WorkflowState.CONFIRMING_DIALOG)
                 else:
-                    logger.error(f"{self.state}失败，流程终止")
-                    self.transition_to(WorkflowState.ERROR)
+                    logger.error(f"状态 {self.state.value} 执行失败，流程终止")
+                    self.transition_to(WorkflowState.ERROR_STATE)
 
-            # 点击是
-            elif self.state == WorkflowState.CLICK_YES:
+            # 确认对话框状态
+            elif self.state == WorkflowState.CONFIRMING_DIALOG:
                 image_name = "yes"
-                (center_point1, confidence1) = wait_for_image(image_name, timeout=30)
+                center_point1, confidence1 = wait_for_image(image_name, timeout=30)
                 if center_point1:
                     left_click(center_point1[0], center_point1[1])
                     self.success_count += 1
-                    logger.info("=========================")
+                    logger.info("=" * 30)
                     logger.info(f"成功执行次数: {self.success_count}")
-                    logger.info("=========================")
-                    self.transition_to(WorkflowState.WAIT_MAIN_MEAN)
+                    logger.info("=" * 30)
+                    self.transition_to(WorkflowState.WAITING_FOR_MAIN_MENU)
                 else:
-                    logger.error(f"{self.state}失败，流程终止")
-                    self.transition_to(WorkflowState.ERROR)
-            elif self.state == WorkflowState.ERROR:
+                    logger.error(f"状态 {self.state.value} 执行失败，流程终止")
+                    self.transition_to(WorkflowState.ERROR_STATE)
+
+            # 错误状态
+            elif self.state == WorkflowState.ERROR_STATE:
                 logger.error("工作流程执行失败!")
 
                 # 检查游戏进程是否存在
@@ -266,7 +284,7 @@ class WorkflowStateMachine:
                     if start_game():
                         logger.info("游戏已重新启动，等待30秒让游戏完全加载...")
                         time.sleep(30)  # 等待游戏完全加载
-                        self.transition_to(WorkflowState.WAIT_MAIN_MEAN)
+                        self.transition_to(WorkflowState.WAITING_FOR_MAIN_MENU)
                         return self.execute()  # 重新开始执行工作流
                     else:
                         logger.error("重新启动游戏失败，请手动启动游戏后重试。")
@@ -283,7 +301,7 @@ class WorkflowStateMachine:
             if not is_game_running():
                 logger.error("异常可能是由于游戏进程不存在导致的")
 
-            self.transition_to(WorkflowState.ERROR)
+            self.transition_to(WorkflowState.ERROR_STATE)
             return False
 
 def execute_workflow() -> bool:
