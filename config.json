@@ -1,0 +1,33 @@
+{
+    "timeouts": {
+        "main_menu": 120,
+        "pmc_select": 30,
+        "next_step": 30,
+        "factory_map": 30,
+        "ready": 30,
+        "game_start": 600,
+        "character_death": 1200,
+        "return_to_main": 30,
+        "confirm_dialog": 30
+    },
+    "thresholds": {
+        "default": 0.7,
+        "main_menu": 0.7,
+        "pmc_select": 0.7,
+        "next_step": 0.7,
+        "factory_map": 0.7,
+        "ready": 0.7,
+        "game_start": 0.7,
+        "character_death": 0.7,
+        "return_to_main": 0.7,
+        "confirm_dialog": 0.7
+    },
+    "intervals": {
+        "check_interval": 1.0
+    },
+    "game": {
+        "process_name": "EscapeFromTarkov.exe",
+        "path": "C:\\Battlestate Games\\EFT\\EscapeFromTarkov.exe",
+        "restart_wait_time": 30
+    }
+}

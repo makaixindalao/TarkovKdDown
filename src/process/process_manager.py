@@ -14,15 +14,11 @@ import subprocess
 import psutil
 from typing import Optional
 
+# 导入配置管理模块
+from config_manager import get_game_process_name, get_game_path, get_restart_wait_time
+
 # 配置日志
 logger = logging.getLogger(__name__)
-
-# 游戏进程名称和启动路径
-GAME_PROCESS_NAME = "EscapeFromTarkov.exe"
-GAME_PATH = r"C:\Battlestate Games\EFT\EscapeFromTarkov.exe"  # 默认安装路径，可能需要根据实际情况调整
-
-# 游戏启动超时时间（秒）
-GAME_START_TIMEOUT = 120
 
 
 def is_game_running() -> bool:
@@ -34,15 +30,17 @@ def is_game_running() -> bool:
             - True: 游戏进程正在运行
             - False: 游戏进程未运行
     """
+    game_process_name = get_game_process_name()
+
     for proc in psutil.process_iter(['pid', 'name']):
         try:
-            if GAME_PROCESS_NAME.lower() in proc.info['name'].lower():
+            if game_process_name.lower() in proc.info['name'].lower():
                 logger.info(f"检测到游戏进程: {proc.info['name']} (PID: {proc.info['pid']})")
                 return True
         except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
             pass
 
-    logger.warning(f"未检测到游戏进程: {GAME_PROCESS_NAME}")
+    logger.warning(f"未检测到游戏进程: {game_process_name}")
     return False
 
 
@@ -53,9 +51,11 @@ def get_game_process() -> Optional[psutil.Process]:
     Returns:
         Optional[psutil.Process]: 游戏进程对象，如果未找到则返回None
     """
+    game_process_name = get_game_process_name()
+
     for proc in psutil.process_iter(['pid', 'name']):
         try:
-            if GAME_PROCESS_NAME.lower() in proc.info['name'].lower():
+            if game_process_name.lower() in proc.info['name'].lower():
                 return proc
         except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
             pass
@@ -72,6 +72,10 @@ def start_game() -> bool:
             - True: 成功启动游戏
             - False: 启动游戏失败
     """
+    # 获取配置
+    game_path = get_game_path()
+    game_start_timeout = get_restart_wait_time()
+
     # 如果游戏已经在运行，则无需重新启动
     if is_game_running():
         logger.info("游戏已经在运行中，无需重新启动")
@@ -79,22 +83,22 @@ def start_game() -> bool:
 
     try:
         # 检查游戏路径是否存在
-        if not os.path.exists(GAME_PATH):
-            logger.error(f"游戏路径不存在: {GAME_PATH}")
+        if not os.path.exists(game_path):
+            logger.error(f"游戏路径不存在: {game_path}")
             return False
 
         # 启动游戏进程
-        logger.info(f"正在启动游戏: {GAME_PATH}")
-        subprocess.Popen(GAME_PATH)
+        logger.info(f"正在启动游戏: {game_path}")
+        subprocess.Popen(game_path)
 
         # 等待游戏启动
-        for _ in range(GAME_START_TIMEOUT):
+        for _ in range(game_start_timeout):
             time.sleep(1)
             if is_game_running():
                 logger.info("游戏已成功启动")
                 return True
 
-        logger.error(f"游戏启动超时（{GAME_START_TIMEOUT}秒）")
+        logger.error(f"游戏启动超时（{game_start_timeout}秒）")
         return False
 
     except Exception as e:

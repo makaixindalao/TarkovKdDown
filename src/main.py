@@ -19,6 +19,7 @@ from input.mouse_control import left_click
 from input.keyboard_control import key_press
 from image.image_manager import get_image_path, ensure_image_dir, image_exists
 from process.process_manager import is_game_running, start_game
+from config_manager import get_timeout, get_threshold, get_check_interval, get_restart_wait_time
 
 # 配置日志
 logging.basicConfig(
@@ -59,7 +60,7 @@ class WorkflowState(enum.Enum):
 def wait_for_image(
     image_name: str,
     timeout: int = 30,
-    check_interval: float = 1.0,
+    check_interval: Optional[float] = None,
     threshold: float = 0.7,
     region: Optional[Tuple[int, int, int, int]] = None
 ) -> Tuple[Optional[Tuple[int, int]], float]:
@@ -69,7 +70,7 @@ def wait_for_image(
     Args:
         image_name: 图片名称
         timeout: 超时时间（秒）
-        check_interval: 检查间隔（秒）
+        check_interval: 检查间隔（秒），如果为None则使用配置文件中的值
         threshold: 匹配阈值
         region: 搜索区域，格式为(x, y, width, height)
 
@@ -78,6 +79,10 @@ def wait_for_image(
             - 如果找到: ((center_x, center_y), confidence)
             - 如果超时: (None, 0)
     """
+    # 如果未指定检查间隔，则使用配置文件中的值
+    if check_interval is None:
+        check_interval = get_check_interval()
+
     template_path = get_image_path(image_name)
 
     # 检查模板图像是否存在
@@ -163,7 +168,13 @@ class WorkflowStateMachine:
             elif self.state == WorkflowState.WAITING_FOR_MAIN_MENU:
                 logger.info(f"等待主界面加载, 当前执行成功次数: {self.success_count}")
                 image_name = "escape"
-                center_point1, confidence1 = wait_for_image(image_name, timeout=120)
+                timeout = get_timeout("main_menu")
+                threshold = get_threshold("main_menu")
+                center_point1, confidence1 = wait_for_image(
+                    image_name,
+                    timeout=timeout,
+                    threshold=threshold
+                )
                 if center_point1:
                     left_click(center_point1[0], center_point1[1])
                     self.transition_to(WorkflowState.SELECTING_PMC)
@@ -174,12 +185,22 @@ class WorkflowStateMachine:
             # 选择PMC状态
             elif self.state == WorkflowState.SELECTING_PMC:
                 image_name = "pmc_select"
-                center_point1, confidence1 = wait_for_image(image_name, timeout=30)
+                timeout = get_timeout("pmc_select")
+                threshold = get_threshold("pmc_select")
+                center_point1, confidence1 = wait_for_image(
+                    image_name,
+                    timeout=timeout,
+                    threshold=threshold
+                )
                 if center_point1:
                     self.transition_to(WorkflowState.PROCEEDING_TO_NEXT)
                 else:
                     image_name = "pmc"
-                    center_point1, confidence1 = wait_for_image(image_name, timeout=30)
+                    center_point1, confidence1 = wait_for_image(
+                        image_name,
+                        timeout=timeout,
+                        threshold=threshold
+                    )
                     if center_point1:
                         self.transition_to(WorkflowState.PROCEEDING_TO_NEXT)
                     else:
@@ -189,7 +210,13 @@ class WorkflowStateMachine:
             # 下一步状态
             elif self.state == WorkflowState.PROCEEDING_TO_NEXT:
                 image_name = "nextstep"
-                center_point1, confidence1 = wait_for_image(image_name, timeout=30)
+                timeout = get_timeout("next_step")
+                threshold = get_threshold("next_step")
+                center_point1, confidence1 = wait_for_image(
+                    image_name,
+                    timeout=timeout,
+                    threshold=threshold
+                )
                 if center_point1:
                     left_click(center_point1[0], center_point1[1])
                     self.transition_to(WorkflowState.SELECTING_FACTORY_MAP)
@@ -200,13 +227,23 @@ class WorkflowStateMachine:
             # 选择工厂地图状态
             elif self.state == WorkflowState.SELECTING_FACTORY_MAP:
                 image_name = "factory"
-                center_point1, confidence1 = wait_for_image(image_name, timeout=30)
+                timeout = get_timeout("factory_map")
+                threshold = get_threshold("factory_map")
+                center_point1, confidence1 = wait_for_image(
+                    image_name,
+                    timeout=timeout,
+                    threshold=threshold
+                )
                 if center_point1:
                     left_click(center_point1[0], center_point1[1])
                     self.transition_to(WorkflowState.PREPARING_DEPLOYMENT)
                 else:
                     image_name = "factory_select"
-                    center_point1, confidence1 = wait_for_image(image_name, timeout=30)
+                    center_point1, confidence1 = wait_for_image(
+                        image_name,
+                        timeout=timeout,
+                        threshold=threshold
+                    )
                     if center_point1:
                         left_click(center_point1[0], center_point1[1])
                         self.transition_to(WorkflowState.PREPARING_DEPLOYMENT)
@@ -217,7 +254,13 @@ class WorkflowStateMachine:
             # 准备部署状态
             elif self.state == WorkflowState.PREPARING_DEPLOYMENT:
                 image_name = "ready"
-                center_point1, confidence1 = wait_for_image(image_name, timeout=30)
+                timeout = get_timeout("ready")
+                threshold = get_threshold("ready")
+                center_point1, confidence1 = wait_for_image(
+                    image_name,
+                    timeout=timeout,
+                    threshold=threshold
+                )
                 if center_point1:
                     left_click(center_point1[0], center_point1[1])
                     self.transition_to(WorkflowState.WAITING_FOR_GAME_START)
@@ -228,7 +271,13 @@ class WorkflowStateMachine:
             # 等待游戏开始状态
             elif self.state == WorkflowState.WAITING_FOR_GAME_START:
                 image_name = "in_game"
-                center_point1, confidence1 = wait_for_image(image_name, timeout=600)
+                timeout = get_timeout("game_start")
+                threshold = get_threshold("game_start")
+                center_point1, confidence1 = wait_for_image(
+                    image_name,
+                    timeout=timeout,
+                    threshold=threshold
+                )
                 if center_point1:
                     self.transition_to(WorkflowState.WAITING_FOR_CHARACTER_DEATH)
                 else:
@@ -238,7 +287,13 @@ class WorkflowStateMachine:
             # 等待角色死亡状态
             elif self.state == WorkflowState.WAITING_FOR_CHARACTER_DEATH:
                 image_name = "nextstep"
-                center_point1, confidence1 = wait_for_image(image_name, timeout=600)
+                timeout = get_timeout("character_death")
+                threshold = get_threshold("character_death")
+                center_point1, confidence1 = wait_for_image(
+                    image_name,
+                    timeout=timeout,
+                    threshold=threshold
+                )
                 if center_point1:
                     self.transition_to(WorkflowState.RETURNING_TO_MAIN_MENU)
                 else:
@@ -248,7 +303,13 @@ class WorkflowStateMachine:
             # 返回主菜单状态
             elif self.state == WorkflowState.RETURNING_TO_MAIN_MENU:
                 image_name = "main_menu"
-                center_point1, confidence1 = wait_for_image(image_name, timeout=30)
+                timeout = get_timeout("return_to_main")
+                threshold = get_threshold("return_to_main")
+                center_point1, confidence1 = wait_for_image(
+                    image_name,
+                    timeout=timeout,
+                    threshold=threshold
+                )
                 if center_point1:
                     left_click(center_point1[0], center_point1[1])
                     self.transition_to(WorkflowState.CONFIRMING_DIALOG)
@@ -259,7 +320,13 @@ class WorkflowStateMachine:
             # 确认对话框状态
             elif self.state == WorkflowState.CONFIRMING_DIALOG:
                 image_name = "yes"
-                center_point1, confidence1 = wait_for_image(image_name, timeout=30)
+                timeout = get_timeout("confirm_dialog")
+                threshold = get_threshold("confirm_dialog")
+                center_point1, confidence1 = wait_for_image(
+                    image_name,
+                    timeout=timeout,
+                    threshold=threshold
+                )
                 if center_point1:
                     left_click(center_point1[0], center_point1[1])
                     self.success_count += 1
@@ -282,8 +349,9 @@ class WorkflowStateMachine:
                     # 尝试重新启动游戏
                     logger.info("正在尝试重新启动游戏...")
                     if start_game():
-                        logger.info("游戏已重新启动，等待30秒让游戏完全加载...")
-                        time.sleep(30)  # 等待游戏完全加载
+                        restart_wait_time = get_restart_wait_time()
+                        logger.info(f"游戏已重新启动，等待{restart_wait_time}秒让游戏完全加载...")
+                        time.sleep(restart_wait_time)  # 等待游戏完全加载
                         self.transition_to(WorkflowState.WAITING_FOR_MAIN_MENU)
                         return self.execute()  # 重新开始执行工作流
                     else:
